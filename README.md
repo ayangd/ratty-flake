@@ -2,6 +2,10 @@
 
 Nix flake for [Ratty](https://github.com/orhun/ratty) — a GPU-rendered terminal emulator with inline 3D graphics, built with Rust + Bevy.
 
+## Heads up: your machine will go brrr
+
+Ratty depends on **Bevy** (a full game engine) for GPU-rendered terminal graphics. This pulls in ~664 crates including wgpu, naga (shader compiler), winit, the entire async runtime, font/text shaping stacks, and platform windowing libraries. To make matters worse, two major versions of wgpu ship side-by-side (27 and 28) due to a version split between Bevy and Vello. Expect a long first build — release mode uses fat LTO with a single codegen unit across all of this.
+
 ## Usage
 
 Add as a flake input:
