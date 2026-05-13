@@ -20,10 +20,10 @@
           owner = "orhun";
           repo = "ratty";
           rev = "v0.2.0";
-          hash = pkgs.lib.fakeHash;
+          hash = "sha256-fDNlyTOhwI1nzNf2/Z9DWtTEdJCZEDogLu13ETbpJAw=";
         };
 
-        cargoHash = pkgs.lib.fakeHash;
+        cargoHash = "sha256-4oLBONIyC924UGTw0d9RzGvNBolWdLMzzC+mihcD3B0=";
 
         nativeBuildInputs = with pkgs; [
           pkg-config
@@ -38,10 +38,10 @@
           vulkan-loader
           alsa-lib
           udev
-          xorg.libX11
-          xorg.libXcursor
-          xorg.libXrandr
-          xorg.libXi
+          libx11
+          libxcursor
+          libxrandr
+          libxi
         ];
 
         postFixup =
