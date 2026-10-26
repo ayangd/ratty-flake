@@ -36,19 +36,15 @@ nix build
 ./update.sh
 ```
 
-This will:
+The version and hashes live in `sources.json`, which `flake.nix` reads. The script will:
 1. Query the GitHub API for the latest Ratty release tag
 2. Prefetch the new source tarball and compute its hash
-3. Update `version`, `rev`, and `hash` in `flake.nix`
-4. Reset `cargoHash` to a dummy value
+3. Update `version` and `srcHash` in `sources.json`
+4. Build only the cargo vendor step to compute `cargoHash`, and write it to `sources.json`
 
-After running the script, rebuild to get the correct cargo vendor hash:
+If the vendor build fails for a reason other than a hash mismatch, the script prints the build log and exits, leaving a dummy `cargoHash` in `sources.json`.
 
-```bash
-nix build 2>&1 | grep 'got:'
-```
-
-Copy the `sha256-...` hash from the output, replace `cargoHash` in `flake.nix`, then build again:
+After running the script, build:
 
 ```bash
 nix build
@@ -57,7 +53,7 @@ nix build
 If the build succeeds, commit the changes:
 
 ```bash
-git add flake.nix flake.lock && git commit -m "bump ratty to vX.Y.Z"
+git add sources.json flake.lock && git commit -m "bump ratty to vX.Y.Z"
 ```
 
 ## Credits

@@ -1,14 +1,24 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-FLAKE="$(dirname "$(realpath "$0")")/flake.nix"
+DIR="$(dirname "$(realpath "$0")")"
+SOURCES="$DIR/sources.json"
 REPO="orhun/ratty"
+FAKE_HASH="sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
+
+# Set a key in sources.json, writing through a temp file so a failure leaves no partial JSON
+set_source() {
+  local tmp
+  tmp=$(mktemp "$SOURCES.XXXXXX")
+  jq --arg key "$1" --arg value "$2" '.[$key] = $value' "$SOURCES" > "$tmp"
+  mv "$tmp" "$SOURCES"
+}
 
 echo "Fetching latest release..."
 LATEST=$(curl -s "https://api.github.com/repos/$REPO/releases/latest" | jq -r .tag_name)
 VERSION="${LATEST#v}"
 
-CURRENT=$(grep 'version = ' "$FLAKE" | head -1 | sed 's/.*"\(.*\)".*/\1/')
+CURRENT=$(jq -r .version "$SOURCES")
 
 if [[ "$VERSION" == "$CURRENT" ]]; then
   echo "Already at $VERSION."
@@ -22,21 +32,27 @@ echo "Prefetching source..."
 SRC_HASH=$(nix-prefetch-url --unpack "https://github.com/$REPO/archive/v${VERSION}.tar.gz" 2>/dev/null)
 SRC_HASH_SRI=$(nix hash convert --hash-algo sha256 --to sri "$SRC_HASH")
 
-# Update version
-sed -i "s|version = \"$CURRENT\"|version = \"$VERSION\"|" "$FLAKE"
+set_source version "$VERSION"
+set_source srcHash "$SRC_HASH_SRI"
 
-# Update rev
-sed -i "s|rev = \"v$CURRENT\"|rev = \"v$VERSION\"|" "$FLAKE"
+# Reset cargoHash to fakeHash so building the vendor step reveals the correct one
+set_source cargoHash "$FAKE_HASH"
 
-# Update src hash
-OLD_SRC_HASH=$(grep -A4 'fetchFromGitHub' "$FLAKE" | grep 'hash = ' | sed 's/.*"\(.*\)".*/\1/')
-sed -i "s|$OLD_SRC_HASH|$SRC_HASH_SRI|" "$FLAKE"
+echo "Computing cargoHash..."
+BUILD_LOG=$(nix build "$DIR#default.cargoDeps" --no-link 2>&1 || true)
+CARGO_HASH=$(grep -oP 'got:\s+\Ksha256-\S+' <<< "$BUILD_LOG" || true)
 
-# Reset cargoHash to fakeHash so build reveals correct one
-OLD_CARGO_HASH=$(grep 'cargoHash = ' "$FLAKE" | sed 's/.*"\(.*\)".*/\1/')
-sed -i "s|cargoHash = \"$OLD_CARGO_HASH\"|cargoHash = \"sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=\"|" "$FLAKE"
+if [[ -z "$CARGO_HASH" ]]; then
+  echo "$BUILD_LOG"
+  echo ""
+  echo "Failed to compute cargoHash; sources.json still has the fake hash." >&2
+  exit 1
+fi
 
-echo "Updated flake.nix to $VERSION"
-echo "src hash: $SRC_HASH_SRI"
+set_source cargoHash "$CARGO_HASH"
+
+echo "Updated sources.json to $VERSION"
+echo "src hash:   $SRC_HASH_SRI"
+echo "cargo hash: $CARGO_HASH"
 echo ""
-echo "Next: nix build 2>&1 | grep 'got:' to get cargoHash, then update and rebuild."
+echo "Next: nix build, then commit sources.json."

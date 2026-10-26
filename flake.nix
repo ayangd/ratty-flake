@@ -10,20 +10,21 @@
     let
       system = "x86_64-linux";
       pkgs = import nixpkgs { inherit system; };
+      sources = builtins.fromJSON (builtins.readFile ./sources.json);
     in
     {
       packages.${system}.default = pkgs.rustPlatform.buildRustPackage {
         pname = "ratty";
-        version = "0.2.0";
+        version = sources.version;
 
         src = pkgs.fetchFromGitHub {
           owner = "orhun";
           repo = "ratty";
-          rev = "v0.2.0";
-          hash = "sha256-fDNlyTOhwI1nzNf2/Z9DWtTEdJCZEDogLu13ETbpJAw=";
+          rev = "v${sources.version}";
+          hash = sources.srcHash;
         };
 
-        cargoHash = "sha256-4oLBONIyC924UGTw0d9RzGvNBolWdLMzzC+mihcD3B0=";
+        cargoHash = sources.cargoHash;
 
         nativeBuildInputs = with pkgs; [
           pkg-config
